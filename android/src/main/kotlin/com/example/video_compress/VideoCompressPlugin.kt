@@ -5,7 +5,6 @@ import android.net.Uri
 import android.util.Log
 import com.otaliastudios.transcoder.Transcoder
 import com.otaliastudios.transcoder.TranscoderListener
-import com.otaliastudios.transcoder.source.TrimDataSource
 import com.otaliastudios.transcoder.source.UriDataSource
 import com.otaliastudios.transcoder.strategy.DefaultAudioStrategy
 import com.otaliastudios.transcoder.strategy.DefaultVideoStrategy
@@ -21,6 +20,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.Future
+import com.example.video_compress.Constants.MICROS_IN_SECOND
 
 /**
  * VideoCompressPlugin
@@ -137,18 +137,29 @@ class VideoCompressPlugin : MethodCallHandler, FlutterPlugin {
                     RemoveTrackStrategy()
                 }
 
-                val dataSource = if (startTime != null || duration != null){
-                    val source = UriDataSource(context, Uri.parse(path))
-                    TrimDataSource(source, (1000 * 1000 * (startTime ?: 0)).toLong(), (1000 * 1000 * (duration ?: 0)).toLong())
-                }else{
-                    UriDataSource(context, Uri.parse(path))
+                //==================== トリミング処理 ====================
+                // TranscoderOptions.Builder の setStartTimeUs / setEndTimeUs を使用して
+                // フル尺以外の圧縮時にも確実に時間範囲を適用する。
+
+                val builder = Transcoder.into(destPath)
+                    .addDataSource(UriDataSource(context, Uri.parse(path)))
+                    .setAudioTrackStrategy(audioTrackStrategy)
+                    .setVideoTrackStrategy(videoTrackStrategy)
+
+                val hasStart = startTime != null && startTime >= 0
+                val hasDuration = duration != null && duration > 0
+
+                if (hasStart) {
+                    builder.setStartTimeUs((startTime!! * MICROS_IN_SECOND))
                 }
 
+                if (hasDuration) {
+                    val startSec = if (hasStart) startTime!! else 0
+                    val endUs = (startSec + duration!!) * MICROS_IN_SECOND
+                    builder.setEndTimeUs(endUs)
+                }
 
-                transcodeFuture = Transcoder.into(destPath!!)
-                        .addDataSource(dataSource)
-                        .setAudioTrackStrategy(audioTrackStrategy)
-                        .setVideoTrackStrategy(videoTrackStrategy)
+                transcodeFuture = builder
                         .setListener(object : TranscoderListener {
                             override fun onTranscodeProgress(progress: Double) {
                                 channel.invokeMethod("updateProgress", progress * 100.00)

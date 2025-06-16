@@ -37,9 +37,7 @@ extension Compress on IVideoCompress {
   Future<T?> _invoke<T>(String name, [Map<String, dynamic>? params]) async {
     T? result;
     try {
-      result = params != null
-          ? await channel.invokeMethod(name, params)
-          : await channel.invokeMethod(name);
+      result = params != null ? await channel.invokeMethod(name, params) : await channel.invokeMethod(name);
     } on PlatformException catch (e) {
       debugPrint('''Error from VideoCompress: 
       Method: $name
@@ -138,6 +136,13 @@ extension Compress on IVideoCompress {
     if (compressProgress$.notSubscribed) {
       debugPrint('''VideoCompress: You can try to subscribe to the 
       compressProgress\$ stream to know the compressing state.''');
+    }
+
+    if (startTime != null && startTime < 0) {
+      throw ArgumentError.value(startTime, 'startTime', 'must be >= 0');
+    }
+    if (duration != null && duration <= 0) {
+      throw ArgumentError.value(duration, 'duration', 'must be > 0');
     }
 
     // ignore: invalid_use_of_protected_member
